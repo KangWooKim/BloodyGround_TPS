@@ -231,7 +231,6 @@ void ABaseZombie::ApplyDamageToTarget()
 
 float ABaseZombie::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-    UE_LOG(LogTemp, Warning, TEXT("Zombie Takes Damage"));
     if (DamageCauser && DamageCauser->IsA(ABaseZombie::StaticClass()))
     {
         return 0.0f;
@@ -248,15 +247,20 @@ float ABaseZombie::TakeDamage(float DamageAmount, struct FDamageEvent const& Dam
     if (Health <= 0)
     {
         HandleDeath();
+        return ActualDamage;
     }
-    else
+
+    // 'Hit reaction' 상태로 전환
+    if (ZombieState != EZombieState::HitReact)
     {
+        GetCharacterMovement()->SetMovementMode(MOVE_None);
         ZombieState = EZombieState::HitReact;
-        GetCharacterMovement()->StopMovementImmediately(); // 움직임 중지
-        if (CurrentTarget == nullptr)
-        {
-            CurrentTarget = Cast<APawn>(DamageCauser);
-        }
+
+        // 기존 타이머가 있으면 취소
+        GetWorldTimerManager().ClearTimer(TimerHandle_HitReactEnd);
+
+        // 'hit reaction' 상태를 일정 시간(예: 3초) 후에 종료하도록 타이머 설정
+        GetWorldTimerManager().SetTimer(TimerHandle_HitReactEnd, this, &ABaseZombie::HitReactEnd, 1.0f, false);
     }
 
     return ActualDamage;
@@ -264,6 +268,8 @@ float ABaseZombie::TakeDamage(float DamageAmount, struct FDamageEvent const& Dam
 
 void ABaseZombie::HitReactEnd()
 {
+    GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+
     ZombieState = EZombieState::None;
 }
 
@@ -271,6 +277,7 @@ void ABaseZombie::HitReactEnd()
 
 void ABaseZombie::HandleDeath()
 {
+    GetCharacterMovement()->SetMovementMode(MOVE_None);
     ZombieState = EZombieState::Death;
 }
 
@@ -303,4 +310,8 @@ bool ABaseZombie::IsTargetInSight(APawn* Target)
 
     // 예를 들어, 5초 이내에 타겟을 감지했다면 시야 범위 내로 간주
     return TimeSinceLastSeen < 5.0f;
+}
+
+void ABaseZombie::TakeShot(FHitResultData HitResult, float WeaponDamage)
+{
 }

@@ -80,8 +80,13 @@ void ABaseWeapon::Fire()
             {
                 if (Character->HasAuthority())
                 {
-                    // 서버에서 직접 적중 처리
-                    // ... 적중 처리 로직 ...
+                    FLocationTimeData TempLocationData = HitZombie->GetServerLocationComponent()->GetLocationData();
+                    FHitResultData HitResultData = HitZombie->GetServerLocationComponent()->ServerTrace(StartLocation, EndLocation, TempLocationData);
+                    if (HitResultData.bHitBody)
+                    {
+                        HitZombie->TakeShot(HitResultData, Damage);
+                        UGameplayStatics::ApplyDamage(HitZombie, Damage, Character->GetController(), this, UDamageType::StaticClass());
+                    }
                 }
                 else if (Character->IsLocallyControlled())
                 {
@@ -114,15 +119,8 @@ void ABaseWeapon::Fire()
         // 몸통에 적중한 경우
         if (HitResults.bHitBody)
         {
+            HitZombie->TakeShot(HitResults, Damage);
             UGameplayStatics::ApplyDamage(HitZombie, Damage, Character->GetController(), this, UDamageType::StaticClass());
-            // 추가적인 처리를 할 수 있습니다. 예: 특정 이펙트 발생
-        }
-
-        // 다리에 적중한 경우
-        if (HitResults.bHitLeg)
-        {
-            // 다리에 대한 특별한 처리가 필요한 경우 여기에 구현합니다.
-            // 예: 이동 속도 감소 등
         }
     }
 

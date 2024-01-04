@@ -126,7 +126,7 @@ FHitResultData  UServerLocationComponent::CheckHitWithTrace(const FVector& Start
     UpdateHitCapsule(RightLegHitCapsule, LocationData.RightLegData);
 
     // Legs에 대한 트레이스 수행 (Body 제외)
-    bool bHitLeg = PerformLineTrace(StartTrace, EndTrace, LeftLegHitCapsule, RightLegHitCapsule);
+    bool bHitLeg = PerformLineTrace(StartTrace, EndTrace, LeftLegHitCapsule) || PerformLineTrace(StartTrace, EndTrace, RightLegHitCapsule);
 
     // 캡슐 컴포넌트 충돌 설정 복원
     RestoreCollisionSettings();
@@ -149,12 +149,33 @@ FHitResultData  UServerLocationComponent::ServerTrace(const FVector& StartTrace,
     UpdateHitCapsule(RightLegComponent, LocationData.RightLegData);
 
     // Legs에 대한 트레이스 수행(Body 제외)
-    bool bHitLeg = PerformLineTrace(StartTrace, EndTrace, LeftLegComponent, RightLegComponent);
+    bool bHitLeg = PerformLineTrace(StartTrace, EndTrace, LeftLegComponent) || PerformLineTrace(StartTrace, EndTrace, RightLegComponent);
 
     // 캡슐 컴포넌트 충돌 설정 복원
     RestoreCollisionSettings();
 
     return FHitResultData(bHitBody, bHitLeg);
+}
+
+FLocationTimeData UServerLocationComponent::GetLocationData()
+{
+    FVector CapsuleLocation = CapsuleComponent->GetComponentLocation();
+    FRotator CapsuleRotation = CapsuleComponent->GetComponentRotation();
+
+    FVector LeftLegLocation = LeftLegComponent->GetComponentLocation();
+    FRotator LeftLegRotation = LeftLegComponent->GetComponentRotation();
+
+    FVector RightLegLocation = RightLegComponent->GetComponentLocation();
+    FRotator RightLegRotation = RightLegComponent->GetComponentRotation();
+
+    float CurrentTime = GetWorld()->GetTimeSeconds();
+
+    return FLocationTimeData(
+        FComponentLocationData(CapsuleLocation, CapsuleRotation),
+        FComponentLocationData(LeftLegLocation, LeftLegRotation),
+        FComponentLocationData(RightLegLocation, RightLegRotation),
+        CurrentTime
+    );
 }
 
 void UServerLocationComponent::UpdateHitCapsule(UCapsuleComponent* HitCapsule, const FComponentLocationData& LocationData)
@@ -164,20 +185,15 @@ void UServerLocationComponent::UpdateHitCapsule(UCapsuleComponent* HitCapsule, c
     // 기록된 원본 캡슐 크기로 설정
     HitCapsule->SetCapsuleSize(CapsuleComponent->GetUnscaledCapsuleRadius(), CapsuleComponent->GetUnscaledCapsuleHalfHeight());
     HitCapsule->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-    HitCapsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+    HitCapsule->SetCollisionResponseToChannel(ECC_ComponentCollision, ECR_Block);
 }
 
-bool UServerLocationComponent::PerformLineTrace(const FVector& StartTrace, const FVector& EndTrace, UCapsuleComponent* PrimaryCapsule, UCapsuleComponent* SecondaryCapsule)
+bool UServerLocationComponent::PerformLineTrace(const FVector& StartTrace, const FVector& EndTrace, UCapsuleComponent* PrimaryCapsule)
 {
     FHitResult HitResult;
     FCollisionQueryParams QueryParams;
-    QueryParams.AddIgnoredComponent(PrimaryCapsule);
-    if (SecondaryCapsule)
-    {
-        QueryParams.AddIgnoredComponent(SecondaryCapsule);
-    }
 
-    bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartTrace, EndTrace, ECC_Visibility, QueryParams);
+    bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, StartTrace, EndTrace, ECC_ComponentCollision, QueryParams);
     return bHit && HitResult.GetComponent() == PrimaryCapsule;
 }
 
@@ -186,6 +202,6 @@ void UServerLocationComponent::RestoreCollisionSettings()
     for (UCapsuleComponent* Capsule : HitCapsules)
     {
         Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+        Capsule->SetCollisionResponseToChannel(ECC_ComponentCollision, ECR_Ignore);
     }
 }

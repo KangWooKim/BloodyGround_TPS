@@ -1,3 +1,5 @@
+#pragma once
+
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -62,6 +64,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "ServerLocation")
         FHitResultData ServerTrace(const FVector& StartTrace, const FVector& EndTrace, const FLocationTimeData& LocationData);
 
+    UFUNCTION(BlueprintCallable, Category = "ServerLocation")
+    FLocationTimeData GetLocationData();
+
 protected:
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -105,7 +110,7 @@ private:
     void CleanupOldData();
 
     void UpdateHitCapsule(UCapsuleComponent* HitCapsule, const FComponentLocationData& LocationData);
-    bool PerformLineTrace(const FVector& StartTrace, const FVector& EndTrace, UCapsuleComponent* PrimaryCapsule, UCapsuleComponent* SecondaryCapsule = nullptr);
+    bool PerformLineTrace(const FVector& StartTrace, const FVector& EndTrace, UCapsuleComponent* PrimaryCapsule);
     void RestoreCollisionSettings();
 
 };

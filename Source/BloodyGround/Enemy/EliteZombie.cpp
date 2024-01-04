@@ -9,6 +9,7 @@
 #include "GameFramework/Character.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 AEliteZombie::AEliteZombie()
 {
@@ -32,51 +33,86 @@ AEliteZombie::AEliteZombie()
 void AEliteZombie::BeginPlay()
 {
 	Super::BeginPlay();
+
+	GetCharacterMovement()->MaxWalkSpeed = 600.f;
 }
 
 float AEliteZombie::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
-	// HitLocation 정보를 가져옴
-	FVector HitLocation;
-	if (ZombieInjuryState == EZombieInjuryState::Injured && DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+	if (DamageCauser && DamageCauser->IsA(ABaseZombie::StaticClass()))
 	{
-		FPointDamageEvent* PointDmg = (FPointDamageEvent*)&DamageEvent;
-		HitLocation = PointDmg->HitInfo.ImpactPoint;
-
-		// 다리에 명중했는지 확인 (가정: 다리의 본 이름이 "LegBone"이라고 가정)
-		if (PointDmg->HitInfo.BoneName == FName("LegBone"))
-		{
-			// 다리에 명중 시 피해량 조정
-			LegDamageAccumulated += DamageAmount;
-		}
-
-		if (ZombieInjuryState == EZombieInjuryState::None && LegDamageAccumulated >= 100)
-		{
-			GetDown();
-		}
+		return 0.0f;
 	}
 
-	// 기본 피해 처리 로직
-	return Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
-}
+	if (ZombieState == EZombieState::Death)
+	{
+		return 0.0f;
+	}
 
+	const float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	Health -= ActualDamage;
 
-bool AEliteZombie::IsShotInLeg(const FHitResult& HitResult)
-{
-	// 'Leg'이라는 태그가 부착된 메시 부분을 히트했는지 확인
-	return HitResult.BoneName.ToString().Contains("Leg");
+	if (Health <= 0)
+	{
+		HandleDeath();
+		return ActualDamage;
+	}
+
+	// 'Hit reaction' 상태로 전환
+	if (ZombieState != EZombieState::HitReact && ZombieInjuryState != EZombieInjuryState::Injured)
+	{
+		GetCharacterMovement()->SetMovementMode(MOVE_None);
+		ZombieState = EZombieState::HitReact;
+
+		// 기존 타이머가 있으면 취소
+		GetWorldTimerManager().ClearTimer(TimerHandle_HitReactEnd);
+
+		// 'hit reaction' 상태를 일정 시간(예: 3초) 후에 종료하도록 타이머 설정
+		GetWorldTimerManager().SetTimer(TimerHandle_HitReactEnd, this, &AEliteZombie::HitReactEnd, 1.0f, false);
+	}
+
+	return ActualDamage;
 }
 
 void AEliteZombie::GetDown()
 {
+	GetCharacterMovement()->SetMovementMode(MOVE_None);
+
+	ZombieInjuryState = EZombieInjuryState::Down;
+
+	GetCharacterMovement()->MaxWalkSpeed = 100.f;
+}
+
+void AEliteZombie::DownEnd()
+{
+	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+
 	ZombieInjuryState = EZombieInjuryState::Injured;
+
+	FTimerHandle TimerHandle_StandUp;
+
+	// 60초 후 StandUp 메서드 호출 설정
+	GetWorldTimerManager().SetTimer(TimerHandle_StandUp, this, &AEliteZombie::StandUp, 60.0f, false);
+}
+
+void AEliteZombie::StandUp()
+{
+	GetCharacterMovement()->SetMovementMode(MOVE_None);
+
+	ZombieInjuryState = EZombieInjuryState::Stand;
 }
 
 void AEliteZombie::StandUpEnd()
 {
+	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+
 	ZombieInjuryState = EZombieInjuryState::None;
+	ZombieState = EZombieState::None;
 
 	LegDamageAccumulated = 0.f;
+
+	GetCharacterMovement()->MaxWalkSpeed = 600.f;
+
 }
 
 void AEliteZombie::Attack(APawn* Target)
@@ -88,6 +124,21 @@ void AEliteZombie::Attack(APawn* Target)
 void AEliteZombie::ApplyDamageToTarget()
 {
 	Super::ApplyDamageToTarget();
+}
+
+void AEliteZombie::TakeShot(FHitResultData HitResult, float WeaponDamage)
+{
+	Super::TakeShot(HitResult, WeaponDamage);
+
+	if (HitResult.bHitLeg)
+	{
+		LegDamageAccumulated += WeaponDamage;
+	}
+
+	if (ZombieInjuryState == EZombieInjuryState::None && LegDamageAccumulated >= 100)
+	{
+		GetDown();
+	}
 }
 
 void AEliteZombie::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

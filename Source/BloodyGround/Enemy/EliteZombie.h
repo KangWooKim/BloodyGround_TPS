@@ -37,11 +37,19 @@ public:
 	void GetDown();
 
 	UFUNCTION(BlueprintCallable, Category = "Zombie|Combat")
+	void DownEnd();
+
+	UFUNCTION(BlueprintCallable, Category = "Zombie|Combat")
+	void StandUp();
+
+	UFUNCTION(BlueprintCallable, Category = "Zombie|Combat")
 	void StandUpEnd();
 
 	virtual void Attack(APawn* Target) override;
 
 	virtual void ApplyDamageToTarget() override;
+
+	virtual void TakeShot(FHitResultData HitResult, float WeaponDamage) override;
 
 protected:
 
@@ -51,9 +59,6 @@ protected:
 	// 다리에 대한 데미지 누적
 	UPROPERTY(Replicated)
 	float LegDamageAccumulated;
-
-	// 다리에 총이 명중했는지 판단하는 함수
-	virtual bool IsShotInLeg(const FHitResult& HitResult);
 
 private:
 

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Perception/PawnSensingComponent.h"
+#include "BloodyGround/Component/ServerLocationComponent.h"
 #include "BaseZombie.generated.h"
 
 UENUM(BlueprintType)
@@ -25,7 +26,12 @@ class BLOODYGROUND_API ABaseZombie : public ACharacter
 public:
     ABaseZombie();
 
+    UFUNCTION()
+    virtual void TakeShot(FHitResultData HitResult, float WeaponDamage);
+
     FORCEINLINE EZombieState GetZombieState() { return ZombieState; }
+
+    FORCEINLINE UServerLocationComponent* GetServerLocationComponent() { return ServerLocationComp; }
 
 protected:
 
@@ -88,6 +94,8 @@ protected:
     // 공격 대기 시간 (초)
     float AttackCooldown = 5.0f;
 
+    FTimerHandle TimerHandle_HitReactEnd;
+
 private:
     FVector GetRandomPatrolPoint();
     void WakeUp();
@@ -109,6 +117,4 @@ private:
 
     UPROPERTY()
     class UServerLocationComponent* ServerLocationComp;
-
-    
 };
