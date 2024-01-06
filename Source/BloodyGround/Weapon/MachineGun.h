@@ -24,6 +24,9 @@ public:
 
 	virtual EWeaponType GetCurrentWeaponType() override;
 
+	UFUNCTION()
+	virtual void ChangeWeapon() override;
+
 protected:
 
 	UFUNCTION()

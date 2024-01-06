@@ -25,6 +25,8 @@ class BLOODYGROUND_API ABaseCharacter : public ACharacter
 
 public:
 	ABaseCharacter();
+
+	FORCEINLINE float GetHealth() { return Health; }
 	
 protected:
 
@@ -76,6 +78,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void HitReactionEnd();
 
+
 	
 
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
@@ -119,4 +122,7 @@ private:
 
 	UPROPERTY(Replicated)
 	ECharacterState CharacterState;
+
+	UFUNCTION()
+	void HandleFire();
 };

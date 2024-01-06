@@ -29,6 +29,10 @@ class BLOODYGROUND_API ABaseWeapon : public APawn
 public:
     ABaseWeapon();
 
+    virtual void ChangeWeapon();
+
+    // 클라이언트에서 발사 애니메이션을 재생하기 위한 함수
+    void ClientPlayFireAnimation();
 
 protected:
     virtual void BeginPlay() override;
@@ -81,6 +85,14 @@ public:
 
     UPROPERTY(Replicated)
     EWeaponState WeaponState;
+
+    // 발사 애니메이션 몽타주
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+    UAnimMontage* FireAnimation;
+
+    // 소음을 발생시키는 함수
+    void MakeNoise(float Loudness);
+
 
 protected:
 

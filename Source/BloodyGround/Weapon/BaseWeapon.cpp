@@ -36,6 +36,10 @@ ABaseWeapon::ABaseWeapon()
     HitThreshold = 100.f;
 }
 
+void ABaseWeapon::ChangeWeapon()
+{
+}
+
 void ABaseWeapon::BeginPlay()
 {
 	Super::BeginPlay();
@@ -96,6 +100,12 @@ void ABaseWeapon::Fire()
             }
         }
     }
+
+    // 발사 애니메이션 재생
+    ClientPlayFireAnimation();
+
+    // 소음 발생
+    MakeNoise(1.0f); // 소음의 크기를 조절할 수 있습니다.
 }
 
     void ABaseWeapon::ServerCheckHit_Implementation(FHitResult ClientHitResult, float HitTime, FVector StartLocation, FVector EndDirection)
@@ -127,6 +137,14 @@ void ABaseWeapon::Fire()
 bool ABaseWeapon::ServerCheckHit_Validate(FHitResult HitResult, float HitTime, FVector StartLocation, FVector EndDirection)
 {
     return true; // 추가적인 유효성 검사 로직이 필요할 수 있습니다
+}
+
+void ABaseWeapon::MakeNoise(float Loudness)
+{
+    if (Character)
+    {
+        Character->MakeNoise(Loudness, Character, GetActorLocation());
+    }
 }
 
 bool ABaseWeapon::CanFire()
@@ -164,4 +182,13 @@ void ABaseWeapon::Reload()
 EWeaponType ABaseWeapon::GetCurrentWeaponType()
 {
 	return EWeaponType::None;
+}
+
+void ABaseWeapon::ClientPlayFireAnimation()
+{
+    if (WeaponState == EWeaponState::Fire && FireAnimation)
+    {
+        // SkeletalMeshComponent가 FireAnimation 애니메이션 몽타주를 재생합니다.
+        SkeletalMeshComponent->PlayAnimation(FireAnimation, false);
+    }
 }

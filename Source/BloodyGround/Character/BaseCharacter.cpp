@@ -265,22 +265,36 @@ void ABaseCharacter::Jump()
 
 void ABaseCharacter::AttackButtonPressed()
 {
+	if (HasAuthority())
+	{
+		HandleFire();
+	}
+	else
+	{
+		ServerAttack();
+	}
+}
+
+void ABaseCharacter::HandleFire()
+{
 	if (InventoryComp && InventoryComp->GetCurrentWeapon())
 	{
 		InventoryComp->GetCurrentWeapon()->Fire();
 	}
+	MulticastAttack();
 }
 
 void ABaseCharacter::ServerAttack_Implementation()
 {
-	MulticastAttack();
+	HandleFire();
 }
 
 void ABaseCharacter::MulticastAttack_Implementation()
 {
-	if(InventoryComp && InventoryComp->GetCurrentWeapon())
+	if (InventoryComp && InventoryComp->GetCurrentWeapon())
 	{
-		InventoryComp->GetCurrentWeapon()->Fire();
+		// 모든 클라이언트에서 발사 애니메이션을 재생합니다.
+		InventoryComp->GetCurrentWeapon()->ClientPlayFireAnimation();
 	}
 }
 

@@ -45,3 +45,8 @@ EWeaponType AMachineGun::GetCurrentWeaponType()
 {
     return EWeaponType::MachineGun;
 }
+
+void AMachineGun::ChangeWeapon()
+{
+    
+}
