@@ -117,4 +117,7 @@ private:
 
     UPROPERTY()
     class UServerLocationComponent* ServerLocationComp;
+
+    UPROPERTY()
+    FTimerHandle SleepTimerHandle;
 };

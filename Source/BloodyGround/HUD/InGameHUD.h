@@ -18,14 +18,22 @@ class BLOODYGROUND_API AInGameHUD : public AHUD
 
 public:
 
-	FORCEINLINE UInGameWidget* GetInGameWidget() { return InGameWidget; }
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class UUserWidget> InGameWidgetClass;
+
+	UFUNCTION()
+	void UpdateHealth(float HealthPercentage);
+
+	UFUNCTION()
+	void UpdateAmmo(int32 AmmoInMagazine, int32 TotalAmmo);
 
 protected:
 
+	virtual void BeginPlay() override;
 
 private:
 
 	UPROPERTY()
-	UInGameWidget* InGameWidget;
+	class UInGameWidget* InGameWidget;
 	
 };

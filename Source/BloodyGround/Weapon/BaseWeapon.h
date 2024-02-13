@@ -5,6 +5,7 @@
 #include "Animation/AnimMontage.h"
 #include "BaseWeapon.generated.h"
 
+
 UENUM(BlueprintType)
 enum class EWeaponType : uint8
 {
@@ -29,10 +30,12 @@ class BLOODYGROUND_API ABaseWeapon : public APawn
 public:
     ABaseWeapon();
 
-    virtual void ChangeWeapon();
-
+    UFUNCTION(NetMulticast, Reliable)
     // 클라이언트에서 발사 애니메이션을 재생하기 위한 함수
-    void ClientPlayFireAnimation();
+    void MulticastPlayFireAnimation();
+
+    UFUNCTION(Server, Reliable)
+    void ServerPlayFireAnimation();
 
 protected:
     virtual void BeginPlay() override;
@@ -57,8 +60,18 @@ public:
     virtual void Fire();
 
     // 탄창 리로드 함수
-    UFUNCTION()
+    UFUNCTION(BlueprintCallable)
     void Reload();
+
+    UFUNCTION()
+     virtual void PerformReload();
+
+    // 서버에서 재장전을 처리하기 위한 함수
+    UFUNCTION(Server, Reliable)
+     void ServerReload();
+
+    UFUNCTION(NetMulticast, Reliable)
+    void MulticastPlayReloadAnimation();
 
     virtual EWeaponType GetCurrentWeaponType();
 
@@ -88,18 +101,22 @@ public:
 
     // 발사 애니메이션 몽타주
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
-    UAnimMontage* FireAnimation;
+    class UAnimMontage* FireAnimation;
 
+    // 재장전 애니메이션 몽타주
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+    class UAnimMontage* ReloadAnimation;
+
+    UFUNCTION(Server, Reliable)
     // 소음을 발생시키는 함수
-    void MakeNoise(float Loudness);
-
+    void WeaponNoise(float Loudness);
 
 protected:
 
     UFUNCTION(Server, Reliable, WithValidation)
     void ServerCheckHit(FHitResult HitResult, float HitTime, FVector StartLocation, FVector EndDirection);
 
-
+   
 private:
 
     UPROPERTY()

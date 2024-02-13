@@ -36,12 +36,17 @@ protected:
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 	void HandleDeath();
 
+	UFUNCTION(Server, Reliable, BlueprintCallable)
+	void ServerFootStep();
+
 public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	virtual void StartAiming();
 	virtual void StopAiming();
+
+	FORCEINLINE class AInGameHUD* GetInGameHUD() { return PlayerHUD; }
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Health")
 	float Health;
@@ -53,12 +58,6 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	class UInventoryComponent* InventoryComp; // 인벤토리 컴포넌트 추가
-
-	UFUNCTION(Server, Reliable)
-	void ServerAttack();
-
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastAttack();
 
 	UFUNCTION(Server, Reliable)
 	void ServerStopAttack();
@@ -90,6 +89,8 @@ public:
 	UPROPERTY(visibleAnywhere, BlueprintReadOnly, Category = Noise)
 	class UPawnNoiseEmitterComponent* NoiseEmitter;
 
+	UFUNCTION(BlueprintCallable)
+	void Respawn();
 
 private:
 	void MoveForward(float Value);
@@ -123,6 +124,12 @@ private:
 	UPROPERTY(Replicated)
 	ECharacterState CharacterState;
 
-	UFUNCTION()
-	void HandleFire();
+	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"))
+	float FootstepLoudness = 0.2f;
+
+	UPROPERTY()
+	class APlayerController* PlayerController;
+
+	UPROPERTY()
+	class AInGameHUD* PlayerHUD;
 };

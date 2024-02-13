@@ -38,6 +38,10 @@ public:
     void RemoveWeapon(ABaseWeapon* WeaponToRemove);
     void SetInitWeapon(ABaseWeapon* Weapon);
 
+    FORCEINLINE int32 GetPistolAmmo() { return PistolAmmo; }
+    FORCEINLINE int32 GetMachineGunAmmo() { return MachineGunAmmo; }
+    
+
     // 무기 전환
     void ChangeWeapon();
 
@@ -46,12 +50,8 @@ public:
 
     // 탄알 관련 함수
     void SetPistolAmmo(int32 NewAmmo);
-    int32 GetPistolAmmo() const;
     void SetMachineGunAmmo(int32 NewAmmo);
-    int32 GetMachineGunAmmo() const;
 
-    void UsePistolAmmo();
-    void UseMachineGunAmmo();
 
     // 네트워크 복제를 위한 함수
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

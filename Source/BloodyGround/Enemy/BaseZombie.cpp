@@ -11,6 +11,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "BloodyGround/Component/ServerLocationComponent.h"
+#include "BloodyGround/GameState/BloodyGroundGameState.h"
 
 ABaseZombie::ABaseZombie()
 {
@@ -93,6 +94,36 @@ void ABaseZombie::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
+    // 게임 상태 확인을 위한 변수
+    ABloodyGroundGameState* GameState = GetWorld()->GetGameState<ABloodyGroundGameState>();
+    if (!GameState) return;
+
+    // 밤 상태일 때의 처리
+    if (GameState->DayNightCycle == EDayNightCycle::Night)
+    {
+        if (ZombieState != EZombieState::Sleep && !CurrentTarget)
+        {
+            if (!GetWorldTimerManager().IsTimerActive(SleepTimerHandle))
+            {
+                GetWorldTimerManager().SetTimer(SleepTimerHandle, this, &ABaseZombie::GoBackToSleep, TimeToSleep, false);
+            }
+        }
+    }
+    else
+    {
+        if (GetWorldTimerManager().IsTimerActive(SleepTimerHandle))
+        {
+            GetWorldTimerManager().ClearTimer(SleepTimerHandle);
+        }
+    }
+
+    // 현재 타겟(플레이어)가 사망했는지 확인
+    ABaseCharacter* PlayerCharacter = Cast<ABaseCharacter>(CurrentTarget);
+    if (PlayerCharacter && PlayerCharacter->GetHealth() <= 0)
+    {
+        CurrentTarget = nullptr;
+        RestartPatrol();
+    }
 
     if (ZombieState == EZombieState::Attacking || ZombieState == EZombieState::Sleep || ZombieState == EZombieState::HitReact)
     {
@@ -139,6 +170,7 @@ void ABaseZombie::Tick(float DeltaTime)
 }
 
 
+
 FVector ABaseZombie::GetRandomPatrolPoint()
 {
     UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
@@ -152,6 +184,13 @@ FVector ABaseZombie::GetRandomPatrolPoint()
 
 void ABaseZombie::OnSeePlayer(APawn* Pawn)
 {
+    // 사망한 플레이어는 무시
+    ABaseCharacter* PlayerCharacter = Cast<ABaseCharacter>(Pawn);
+    if (ZombieState == EZombieState::Sleep || !PlayerCharacter || PlayerCharacter->GetHealth() <= 0)
+    {
+        return;
+    }
+
     if (ZombieState == EZombieState::Sleep)
     {
         return;
@@ -173,9 +212,17 @@ void ABaseZombie::OnSeePlayer(APawn* Pawn)
 
 void ABaseZombie::OnHearNoise(APawn* NoiseInstigator, const FVector& Location, float Volume)
 {
+    // 사망한 플레이어에 대한 반응 무시
+    ABaseCharacter* PlayerCharacter = Cast<ABaseCharacter>(NoiseInstigator);
+    if (ZombieState == EZombieState::Sleep || (PlayerCharacter && PlayerCharacter->GetHealth() <= 0))
+    {
+        WakeUp();
+        return;
+    }
+
     if (ZombieState == EZombieState::Sleep)
     {
-        return;
+        WakeUp();
     }
 
     if (NoiseInstigator->ActorHasTag(FName("Zombie")) || CurrentTarget != nullptr)
@@ -183,27 +230,36 @@ void ABaseZombie::OnHearNoise(APawn* NoiseInstigator, const FVector& Location, f
         return;
     }
 
-    WakeUp();
- 
     AAIController* AIController = Cast<AAIController>(GetController());
     if (AIController)
     {
-        AIController->MoveToActor(NoiseInstigator);
+        AIController->MoveToLocation(Location);
         CurrentTarget = NoiseInstigator;
     }
 }
 
+
 void ABaseZombie::WakeUp()
 {
-    ZombieState = EZombieState::None;
+    ZombieState = EZombieState::None; // 상태를 None으로 변경
+
+    // 타이머가 설정되어 있다면 취소
+    if (GetWorldTimerManager().IsTimerActive(SleepTimerHandle))
+    {
+        GetWorldTimerManager().ClearTimer(SleepTimerHandle);
+    }
 }
 
 void ABaseZombie::GoBackToSleep()
 {
     ZombieState = EZombieState::Sleep;
-    // 추가 로직...
-    FTimerHandle UnusedHandle;
-    GetWorldTimerManager().SetTimer(UnusedHandle, this, &ABaseZombie::GoBackToSleep, TimeToSleep, false);
+
+    // 순찰 및 기타 활동 중단
+    AAIController* AIController = Cast<AAIController>(GetController());
+    if (AIController)
+    {
+        AIController->StopMovement();
+    }
 }
 
 void ABaseZombie::Attack(APawn* Target)
@@ -250,6 +306,12 @@ float ABaseZombie::TakeDamage(float DamageAmount, struct FDamageEvent const& Dam
         return ActualDamage;
     }
 
+    if (ZombieState == EZombieState::Sleep)
+    {
+        WakeUp();
+        CurrentTarget = Cast<APawn>(DamageCauser);
+    }
+
     // 'Hit reaction' 상태로 전환
     if (ZombieState != EZombieState::HitReact)
     {
@@ -259,8 +321,9 @@ float ABaseZombie::TakeDamage(float DamageAmount, struct FDamageEvent const& Dam
         // 기존 타이머가 있으면 취소
         GetWorldTimerManager().ClearTimer(TimerHandle_HitReactEnd);
 
-        // 'hit reaction' 상태를 일정 시간(예: 3초) 후에 종료하도록 타이머 설정
         GetWorldTimerManager().SetTimer(TimerHandle_HitReactEnd, this, &ABaseZombie::HitReactEnd, 1.0f, false);
+
+        CurrentTarget = Cast<APawn>(DamageCauser);
     }
 
     return ActualDamage;
@@ -279,6 +342,7 @@ void ABaseZombie::HandleDeath()
 {
     GetCharacterMovement()->SetMovementMode(MOVE_None);
     ZombieState = EZombieState::Death;
+    CurrentTarget = nullptr;
 }
 
 void ABaseZombie::DeathEnd()

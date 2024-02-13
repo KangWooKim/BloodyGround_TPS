@@ -36,10 +36,6 @@ ABaseWeapon::ABaseWeapon()
     HitThreshold = 100.f;
 }
 
-void ABaseWeapon::ChangeWeapon()
-{
-}
-
 void ABaseWeapon::BeginPlay()
 {
 	Super::BeginPlay();
@@ -64,6 +60,16 @@ void ABaseWeapon::Tick(float DeltaTime)
 
 void ABaseWeapon::Fire()
 {
+    if (Character->HasAuthority())
+    {
+        MulticastPlayFireAnimation();
+        WeaponNoise(1.f);
+    }
+    else if(Character->IsLocallyControlled())
+    {
+        ServerPlayFireAnimation();
+    }
+
     WeaponState = EWeaponState::Fire;
 
     if (Character)
@@ -100,12 +106,6 @@ void ABaseWeapon::Fire()
             }
         }
     }
-
-    // 발사 애니메이션 재생
-    ClientPlayFireAnimation();
-
-    // 소음 발생
-    MakeNoise(1.0f); // 소음의 크기를 조절할 수 있습니다.
 }
 
     void ABaseWeapon::ServerCheckHit_Implementation(FHitResult ClientHitResult, float HitTime, FVector StartLocation, FVector EndDirection)
@@ -139,7 +139,7 @@ bool ABaseWeapon::ServerCheckHit_Validate(FHitResult HitResult, float HitTime, F
     return true; // 추가적인 유효성 검사 로직이 필요할 수 있습니다
 }
 
-void ABaseWeapon::MakeNoise(float Loudness)
+void ABaseWeapon::WeaponNoise_Implementation(float Loudness)
 {
     if (Character)
     {
@@ -164,19 +164,53 @@ void ABaseWeapon::ReloadEnd()
 
 void ABaseWeapon::Reload()
 {
-    if (Character == nullptr || Character->InventoryComp == nullptr)
+    if (Character)
     {
-        return; // 캐릭터 또는 인벤토리 컴포넌트가 없는 경우 리턴
+        // 클라이언트에서 서버로 재장전 요청 전송
+        if (Character->IsLocallyControlled() && !Character->HasAuthority())
+        {
+            ServerReload();
+        }
+
+        // 서버에서 직접 재장전 처리
+        else if (Character->HasAuthority())
+        {
+            PerformReload();
+        }
     }
+}
 
-    if (WeaponState != EWeaponState::None) return;
+void ABaseWeapon::PerformReload()
+{
+    if (WeaponState == EWeaponState::None)
+    {
+        if (Character == nullptr || Character->InventoryComp == nullptr)
+        {
+            return; // 캐릭터 또는 인벤토리 컴포넌트가 없는 경우 리턴
+        }
 
-    WeaponState = EWeaponState::Reload;
+        WeaponState = EWeaponState::Reload;
 
-    int32 AmmoToReload = FMath::Min(Capacity - CurrentAmmo, Character->InventoryComp->GetPistolAmmo());
-    CurrentAmmo += AmmoToReload;
-    Character->InventoryComp->SetPistolAmmo(Character->InventoryComp->GetPistolAmmo() - AmmoToReload);
-   
+        // 모든 클라이언트에서 재장전 애니메이션 재생
+        MulticastPlayReloadAnimation();
+
+        // 소음 발생
+        WeaponNoise(0.3f);  // 재장전 소음 크기 조정
+    }
+}
+
+
+void ABaseWeapon::ServerReload_Implementation()
+{
+    PerformReload();
+}
+
+void ABaseWeapon::MulticastPlayReloadAnimation_Implementation()
+{
+    if (ReloadAnimation)
+    {
+        SkeletalMeshComponent->PlayAnimation(ReloadAnimation, false);
+    }
 }
 
 EWeaponType ABaseWeapon::GetCurrentWeaponType()
@@ -184,11 +218,16 @@ EWeaponType ABaseWeapon::GetCurrentWeaponType()
 	return EWeaponType::None;
 }
 
-void ABaseWeapon::ClientPlayFireAnimation()
+void ABaseWeapon::ServerPlayFireAnimation_Implementation()
 {
-    if (WeaponState == EWeaponState::Fire && FireAnimation)
+    MulticastPlayFireAnimation();
+    WeaponNoise(1.f);
+}
+
+void ABaseWeapon::MulticastPlayFireAnimation_Implementation()
+{
+    if (FireAnimation)
     {
-        // SkeletalMeshComponent가 FireAnimation 애니메이션 몽타주를 재생합니다.
         SkeletalMeshComponent->PlayAnimation(FireAnimation, false);
     }
 }

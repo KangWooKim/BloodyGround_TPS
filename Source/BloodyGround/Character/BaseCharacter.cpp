@@ -6,6 +6,9 @@
 #include "BloodyGround/Component/InventoryComponent.h"
 #include "Components/PawnNoiseEmitterComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "BloodyGround/BloodyGroundGameModeBase.h"
+#include "BloodyGround/HUD/InGameHUD.h"
+#include "BloodyGround/HUD/InGameWidget.h"
 
 // 클래스 생성자
 ABaseCharacter::ABaseCharacter()
@@ -54,6 +57,13 @@ void ABaseCharacter::BeginPlay()
 
 	CharacterState = ECharacterState::None;
 
+	PlayerController = Cast<APlayerController>(GetController());
+
+	if (PlayerController) 
+	{
+		PlayerHUD = Cast<AInGameHUD>(PlayerController->GetHUD());
+	}
+	
 	// 기본 무기 및 탄알 설정
 	if (HasAuthority())
 	{
@@ -90,7 +100,7 @@ void ABaseCharacter::BeginPlay()
 
 		// 탄알 설정
 		InventoryComp->SetPistolAmmo(50);
-		InventoryComp->SetMachineGunAmmo(200);
+		InventoryComp->SetMachineGunAmmo(300);
 	}
 
 	// 카메라 기본 FOV 설정
@@ -150,16 +160,38 @@ float ABaseCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageE
 		HandleDeath();
 		return Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	}
-
 	
 	CharacterState = ECharacterState::HitReact;
 
+	if (PlayerHUD) {
+		PlayerHUD->UpdateHealth(Health / 100.f);
+	}
+	
 	return Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 }
 
 void ABaseCharacter::HandleDeath()
 {
 	CharacterState = ECharacterState::Death;
+
+	// 모든 입력 비활성화
+	DisableInput(Cast<APlayerController>(GetController()));
+
+	// 사망 처리 후 5초 뒤에 Respawn 함수 호출
+	FTimerHandle RespawnTimerHandle;
+	GetWorld()->GetTimerManager().SetTimer(RespawnTimerHandle, this, &ABaseCharacter::Respawn, 5.0f, false);
+}
+
+void ABaseCharacter::Respawn()
+{
+	// GameMode를 통해 새 캐릭터 스폰
+	if (ABloodyGroundGameModeBase* GM = Cast<ABloodyGroundGameModeBase>(GetWorld()->GetAuthGameMode()))
+	{
+		GM->RespawnPlayer(Cast<APlayerController>(GetController()));
+	}
+
+	// 사망한 캐릭터 제거
+	Destroy();
 }
 
 void ABaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -209,6 +241,11 @@ bool ABaseCharacter::ServerChangeWeapon_Validate()
 	return true; // 유효성 검사 로직
 }
 
+void ABaseCharacter::ServerFootStep_Implementation()
+{
+	this->MakeNoise(FootstepLoudness, this, GetActorLocation());
+}
+
 // 전/후 이동 처리
 void ABaseCharacter::MoveForward(float Value)
 {
@@ -223,6 +260,7 @@ void ABaseCharacter::MoveForward(float Value)
 		const FRotator Rotation = Controller->GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetScaledAxis(EAxis::X);
 		AddMovementInput(Direction, Value);
+		ServerFootStep();
 	}
 }
 
@@ -240,6 +278,7 @@ void ABaseCharacter::MoveRight(float Value)
 		const FRotator Rotation = Controller->GetControlRotation();
 		const FVector Direction = FRotationMatrix(Rotation).GetScaledAxis(EAxis::Y);
 		AddMovementInput(Direction, Value);
+		ServerFootStep();
 	}
 }
 
@@ -261,49 +300,31 @@ void ABaseCharacter::Jump()
 	}
 
 	Super::Jump();
+	ServerFootStep();
 }
 
 void ABaseCharacter::AttackButtonPressed()
-{
-	if (HasAuthority())
-	{
-		HandleFire();
-	}
-	else
-	{
-		ServerAttack();
-	}
-}
-
-void ABaseCharacter::HandleFire()
 {
 	if (InventoryComp && InventoryComp->GetCurrentWeapon())
 	{
 		InventoryComp->GetCurrentWeapon()->Fire();
 	}
-	MulticastAttack();
-}
-
-void ABaseCharacter::ServerAttack_Implementation()
-{
-	HandleFire();
-}
-
-void ABaseCharacter::MulticastAttack_Implementation()
-{
-	if (InventoryComp && InventoryComp->GetCurrentWeapon())
-	{
-		// 모든 클라이언트에서 발사 애니메이션을 재생합니다.
-		InventoryComp->GetCurrentWeapon()->ClientPlayFireAnimation();
-	}
 }
 
 void ABaseCharacter::AttackButtonReleased()
 {
-	if (InventoryComp && InventoryComp->GetCurrentWeapon())
+	if (HasAuthority())
 	{
-		InventoryComp->GetCurrentWeapon()->FireEnd();
+		if (InventoryComp && InventoryComp->GetCurrentWeapon())
+		{
+			InventoryComp->GetCurrentWeapon()->FireEnd();
+		}
 	}
+	else
+	{
+		ServerStopAttack();
+	}
+	
 }
 
 void ABaseCharacter::ServerStopAttack_Implementation()

@@ -69,29 +69,9 @@ void UInventoryComponent::SetPistolAmmo(int32 NewAmmo)
     PistolAmmo = NewAmmo;
 }
 
-int32 UInventoryComponent::GetPistolAmmo() const
-{
-    return PistolAmmo;
-}
-
 void UInventoryComponent::SetMachineGunAmmo(int32 NewAmmo)
 {
     MachineGunAmmo = NewAmmo;
-}
-
-int32 UInventoryComponent::GetMachineGunAmmo() const
-{
-    return MachineGunAmmo;
-}
-
-void UInventoryComponent::UsePistolAmmo()
-{
-    PistolAmmo--;
-}
-
-void UInventoryComponent::UseMachineGunAmmo()
-{
-    MachineGunAmmo--;
 }
 
 void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
